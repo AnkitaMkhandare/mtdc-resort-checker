@@ -1,0 +1,11 @@
+{
+  "validSearchKeyword": "HP smart tank",
+  "invalidSearchKeyword": "XYZ123",
+  "targetProduct": "Smart Tank 589",
+  "nonExistentProduct": "Smart Tank 999",
+  "quantity": 2,
+  "invalidQuantityZero": 0,
+  "invalidQuantityNegative": -1,
+  "nonNumericQuantity": "abc",
+  "exceedStockQuantity": 99999
+}

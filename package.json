@@ -1,16 +1,12 @@
 {
-  "name": "mtdc_resort",
+  "name": "mtdc-resort-checker",
   "version": "1.0.0",
-  "description": "",
+  "description": "MTDC Resort Availability Checker & Email Notifier",
   "main": "check_resort.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node check_resort.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "nodemailer": "^8.0.5"
+    "nodemailer": "^6.9.0"
   }
 }

@@ -1,0 +1,169 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "senderEmail": {
+      "type": "string",
+      "defaultValue": "testmtdcresort@gmail.com"
+    },
+    "receiverEmail": {
+      "type": "string",
+      "defaultValue": "khandareanki@gmail.com"
+    },
+    "senderPass": {
+      "type": "securestring"
+    },
+    "acrPassword": {
+      "type": "securestring"
+    }
+  },
+  "variables": {
+    "logicAppName": "mtdc-daily-scheduler",
+    "containerGroupName": "mtdc-daily-run",
+    "subscriptionId": "[subscription().subscriptionId]",
+    "resourceGroupName": "[resourceGroup().name]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2019-05-01",
+      "name": "[variables('logicAppName')]",
+      "location": "[resourceGroup().location]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "triggers": {
+            "Recurrence": {
+              "type": "Recurrence",
+              "recurrence": {
+                "frequency": "Day",
+                "interval": 1,
+                "timeZone": "India Standard Time",
+                "schedule": {
+                  "hours": ["8"],
+                  "minutes": [0]
+                }
+              }
+            }
+          },
+          "actions": {
+            "Delete_Old_Container": {
+              "type": "Http",
+              "runAfter": {},
+              "inputs": {
+                "method": "DELETE",
+                "uri": "[concat('https://management.azure.com/subscriptions/', variables('subscriptionId'), '/resourceGroups/', variables('resourceGroupName'), '/providers/Microsoft.ContainerInstance/containerGroups/', variables('containerGroupName'), '?api-version=2023-05-01')]",
+                "authentication": {
+                  "type": "ManagedServiceIdentity"
+                }
+              }
+            },
+            "Wait_After_Delete": {
+              "type": "Wait",
+              "runAfter": {
+                "Delete_Old_Container": ["Succeeded", "Failed"]
+              },
+              "inputs": {
+                "interval": {
+                  "count": 30,
+                  "unit": "Second"
+                }
+              }
+            },
+            "Create_Container": {
+              "type": "Http",
+              "runAfter": {
+                "Wait_After_Delete": ["Succeeded"]
+              },
+              "inputs": {
+                "method": "PUT",
+                "uri": "[concat('https://management.azure.com/subscriptions/', variables('subscriptionId'), '/resourceGroups/', variables('resourceGroupName'), '/providers/Microsoft.ContainerInstance/containerGroups/', variables('containerGroupName'), '?api-version=2023-05-01')]",
+                "authentication": {
+                  "type": "ManagedServiceIdentity"
+                },
+                "body": {
+                  "location": "[resourceGroup().location]",
+                  "properties": {
+                    "containers": [
+                      {
+                        "name": "mtdc-checker",
+                        "properties": {
+                          "image": "mtdcacr.azurecr.io/mtdc-resort-checker:latest",
+                          "resources": {
+                            "requests": {
+                              "cpu": 1,
+                              "memoryInGb": 1
+                            }
+                          },
+                          "environmentVariables": [
+                            {
+                              "name": "SENDER_EMAIL",
+                              "value": "[parameters('senderEmail')]"
+                            },
+                            {
+                              "name": "RECEIVER_EMAIL",
+                              "value": "[parameters('receiverEmail')]"
+                            },
+                            {
+                              "name": "SENDER_PASS",
+                              "secureValue": "[parameters('senderPass')]"
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "imageRegistryCredentials": [
+                      {
+                        "server": "mtdcacr.azurecr.io",
+                        "username": "mtdcacr",
+                        "password": "[parameters('acrPassword')]"
+                      }
+                    ],
+                    "restartPolicy": "Never",
+                    "osType": "Linux"
+                  }
+                }
+              }
+            },
+            "Wait_For_Completion": {
+              "type": "Wait",
+              "runAfter": {
+                "Create_Container": ["Succeeded"]
+              },
+              "inputs": {
+                "interval": {
+                  "count": 10,
+                  "unit": "Minute"
+                }
+              }
+            },
+            "Cleanup_Container": {
+              "type": "Http",
+              "runAfter": {
+                "Wait_For_Completion": ["Succeeded"]
+              },
+              "inputs": {
+                "method": "DELETE",
+                "uri": "[concat('https://management.azure.com/subscriptions/', variables('subscriptionId'), '/resourceGroups/', variables('resourceGroupName'), '/providers/Microsoft.ContainerInstance/containerGroups/', variables('containerGroupName'), '?api-version=2023-05-01')]",
+                "authentication": {
+                  "type": "ManagedServiceIdentity"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "logicAppPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Logic/workflows', variables('logicAppName')), '2019-05-01', 'full').identity.principalId]"
+    }
+  }
+}
