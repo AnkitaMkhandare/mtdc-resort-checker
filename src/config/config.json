@@ -1,5 +1,0 @@
-{
-  "baseUrl": "https://www.hp.com/us-en/shop",
-  "headless": true,
-  "timeout": 30000
-}
